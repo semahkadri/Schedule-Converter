@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from typing import List, Dict
 import google.generativeai as genai
 import logging
+import xml.dom.minidom
 
 class ScheduleConverter:
     """A class to convert textual schedule descriptions into AIXM 5.1.1 XML format using the Gemini API."""
@@ -30,7 +31,7 @@ class ScheduleConverter:
         Raises:
             ValueError: If the parsing fails.
         """
-        USE_MOCK = True  
+        USE_MOCK = True 
         if USE_MOCK:
             self.logger.info("Using mock response for debugging")
             mock_response = """
@@ -66,13 +67,13 @@ class ScheduleConverter:
                 raise
 
     def generate_aixm_xml(self, schedules: List[Dict[str, str]]) -> str:
-        """Generate an AIXM 5.1.1 XML string from a list of schedule dictionaries.
+        """Generate a formatted AIXM 5.1.1 XML string from a list of schedule dictionaries.
 
         Args:
             schedules (List[Dict[str, str]]): List of schedule periods.
 
         Returns:
-            str: The AIXM XML string representing the schedule.
+            str: The formatted AIXM XML string with indentation.
         """
         try:
             root = ET.Element('PropertiesWithSchedule')
@@ -85,7 +86,12 @@ class ScheduleConverter:
                 ET.SubElement(timesheet, 'day').text = sched.get('day', 'EVERY DAY')
                 ET.SubElement(timesheet, 'startTime').text = sched.get('startTime', '00:00')
                 ET.SubElement(timesheet, 'endTime').text = sched.get('endTime', '23:59')
-            return ET.tostring(root, encoding='unicode', method='xml')
+            
+            rough_string = ET.tostring(root, encoding='unicode')
+            parsed = xml.dom.minidom.parseString(rough_string)
+            pretty_xml = parsed.toprettyxml(indent="  ", encoding=None)
+            pretty_xml = '\n'.join(line for line in pretty_xml.split('\n') if line.strip() and not line.startswith('<?xml'))
+            return pretty_xml.strip()
         except KeyError as e:
             self.logger.error(f"Missing key in schedule dictionary: {e}")
             raise ValueError(f"Invalid schedule data: missing key {e}")
